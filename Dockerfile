@@ -1,16 +1,13 @@
 # Stage 1: Builder
-FROM python:3.12-alpine AS builder
+FROM python:3.11-slim AS builder
 
-RUN apk add --no-cache \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    musl-dev \
+    libc6-dev \
     libffi-dev \
-    openssl-dev \
-    cargo
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
  
-
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-
 WORKDIR /app
 
 COPY requirements.txt .
@@ -22,16 +19,14 @@ COPY app/ ./app/
 
 
 # Stage 2: Runtime
-FROM gcr.io/distroless/python3-debian12:nonroot AS runtime
+FROM python:3.11-slim AS runtime
 
-COPY --from=builder /install/lib /usr/local/lib
+COPY --from=builder /install /usr/local
 COPY --from=builder /app /app
 
 WORKDIR /app
 
-ENV PYTHONPATH=/usr/local/lib/python3.12/site-packages
 ENV PYTHONDONTWRITEBYTECODE=1
-
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
