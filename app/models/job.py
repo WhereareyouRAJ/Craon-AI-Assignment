@@ -32,7 +32,7 @@ class Job(Document):
     The MongoDB document for a job.
     Each field below becomes a column in the 'jobs' collection.
     """      
-
+     
     # What kind of task this is
     job_type: JobType
 
