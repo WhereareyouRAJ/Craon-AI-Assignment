@@ -65,11 +65,9 @@ services:
       - mongo_data:/data/db
       - mongo_config:/data/configdb
     healthcheck:
-      test: >
-        CMD mongosh
-        --username ${MONGO_ROOT_USER}
-        --password ${MONGO_ROOT_PASSWORD}
-        --eval "db.adminCommand('ping')"
+      test:
+        - "CMD-SHELL"
+        - "mongosh --username ${MONGO_ROOT_USER} --password ${MONGO_ROOT_PASSWORD} --eval \"db.adminCommand('ping')\""
       interval: 10s
       timeout: 5s
       retries: 5
@@ -114,7 +112,7 @@ services:
       <<: *logging
 
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: "0.5"
@@ -148,7 +146,7 @@ services:
       mongodb:
         condition: service_healthy
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: "1.0"
