@@ -558,22 +558,41 @@ Copy `.env.example` to `.env` and fill in values before running. The `.env` file
 | Pending | Firing |
 | :---: | :---: |
 | ![alt text](Screenshots/Pending.png)  | ![text](Screenshots/Firing.png) |
+
+---
+
 # AWS EC2 Deployment Guide
-
+ 
 ## Server Details
-
+ 
 | Setting | Value |
 |---|---|
 | OS | Ubuntu Server 24.04 LTS |
 | Instance type | t3.medium |
 | Storage | 50 GB |
-
+ 
 ---
-
-## Security Group Rules
-
-Open these ports in your EC2 security group:
-
+ 
+## Architecture
+ 
+Redis and MongoDB run as managed AWS services. Only the API and Celery worker run on EC2.
+ 
+```
+EC2 (t3.medium)
+  - FastAPI (port 8000)
+  - Celery Worker
+        |               |
+        v               v
+  ElastiCache       MongoDB Atlas
+  (Redis)           (free tier)
+```
+ 
+---
+ 
+## Step 1 — Security Group Rules
+ 
+Open these ports on your EC2 security group:
+ 
 | Port | Source | Purpose |
 |---|---|---|
 | 22 | My IP only | SSH access |
@@ -581,113 +600,175 @@ Open these ports in your EC2 security group:
 | 3000 | My IP only | Grafana |
 | 5555 | My IP only | Flower |
 | 9090 | My IP only | Prometheus |
-
+ 
 ---
-
-## Connect to the Server
-
+ 
+## Step 2 — Connect to the Server
+ 
 ```bash
 chmod 400 your-key.pem
 ssh -i your-key.pem ubuntu@YOUR_SERVER_IP
 ```
-
+ 
 ---
-
-## Install Docker
-
+ 
+## Step 3 — Install Docker
+ 
 ```bash
 sudo apt update
 sudo apt install -y ca-certificates curl gnupg
-
+ 
 sudo install -m 0755 -d /etc/apt/keyrings
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
 sudo chmod a+r /etc/apt/keyrings/docker.gpg
-
+ 
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
+ 
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
+ 
 sudo usermod -aG docker ubuntu
 newgrp docker
 ```
-
+ 
 ---
-
-## Deploy the Application
-
+ 
+## Step 4 — Set Up MongoDB Atlas
+ 
+MongoDB runs outside AWS on MongoDB Atlas (free tier).
+ 
+1. Go to https://mongodb.com/atlas and create a free account
+2. Create a free M0 cluster — select the same AWS region as your EC2 (for example ap-south-1)
+3. Go to **Network Access** and add your EC2 public IP
+4. Go to **Database Access** and create a user with a username and strong password
+5. Click **Connect** on your cluster, choose "Connect your application", and copy the connection string:
+```
+mongodb+srv://YOUR_USER:YOUR_PASSWORD@cluster0.abc123.mongodb.net/jobqueue
+```
+ 
+---
+ 
+## Step 5 — Set Up ElastiCache (Redis)
+ 
+1. Go to AWS ElastiCache console and click **Create**
+2. Select these settings:
+| Setting | Value |
+|---|---|
+| Engine | Redis OSS |
+| Deployment | Node-based cluster |
+| Configuration | Dev/Test (not Production — saves ~$130/month) |
+| Node type | cache.t3.micro |
+| Cluster name | jobqueue-redis |
+| VPC | Same VPC as your EC2 instance |
+ 
+3. After creation, copy the **Primary Endpoint**:
+```
+jobqueue-redis.abc123.use1.cache.amazonaws.com:6379
+```
+ 
+4. Add an inbound rule to the **ElastiCache security group**:
+| Type | Port | Source |
+|---|---|---|
+| Custom TCP | 6379 | Your EC2 security group ID |
+ 
+This allows your EC2 containers to reach ElastiCache. Without this rule the connection will be refused.
+ 
+---
+ 
+## Step 6 — Deploy the Application
+ 
 ```bash
 # Clone the repo
 git clone https://github.com/YOUR_USERNAME/job-queue-api.git
 cd job-queue-api
-
+ 
 # Create environment file
 cp .env.example .env
-nano .env                      # fill in your values
-
-# Start all containers
+nano .env
+```
+ 
+Fill in the `.env` file with your real connection strings:
+ 
+```bash
+REDIS_URL=redis://jobqueue-redis.abc123.use1.cache.amazonaws.com:6379/0
+MONGODB_URL=mongodb+srv://YOUR_USER:YOUR_PASSWORD@cluster0.abc123.mongodb.net/jobqueue
+MONGODB_DB_NAME=jobqueue
+APP_ENV=production
+```
+ 
+Then start the containers:
+ 
+```bash
 docker compose up --build -d
-
-# Verify everything is running
 docker compose ps
 ```
-
+ 
+You should see two containers running: `jobqueue-api` and `jobqueue-worker`. Redis and MongoDB are no longer in the compose file — they are external services.
+ 
 Visit `http://YOUR_SERVER_IP:8000/docs` to confirm the API is live.
-
+ 
 ---
-
-## Start Monitoring (Optional)
-
+ 
+## Step 7 — Start Monitoring (Optional)
+ 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
 ```
-
+ 
 | URL | Tool |
 |---|---|
-| http://YOUR_SERVER_IP:3000 | Grafana (admin / admin) |
+| http://YOUR_SERVER_IP:3000 | Grafana (login: admin / admin) |
 | http://YOUR_SERVER_IP:5555 | Flower |
 | http://YOUR_SERVER_IP:9090 | Prometheus |
-
+ 
 ---
-
+ 
 ## Common Commands
-
+ 
 ```bash
 docker compose ps                  # check container status
 docker compose logs -f api         # stream API logs
 docker compose logs -f worker      # stream worker logs
 docker compose restart api         # restart one container
 docker compose down                # stop everything
-docker compose down -v             # stop and delete all data
 ```
-
+ 
 ## Redeploy After Code Changes
-
+ 
 ```bash
 git pull
 docker compose up --build -d
 ```
-
+ 
 ---
-
+ 
 ## Auto-restart After Server Reboot
-
-The `restart: unless-stopped` setting in `docker-compose.yml` handles this automatically. Just make sure Docker starts on boot:
-
+ 
 ```bash
 sudo systemctl enable docker
 ```
-
+ 
+The `restart: unless-stopped` setting in `docker-compose.yml` restarts containers automatically after a reboot.
+ 
 ---
-
+ 
 ## Cost
-
+ 
 | Resource | Cost |
 |---|---|
-| t3.medium | ~$30/month |
+| EC2 t3.medium | ~$30/month |
 | 50 GB EBS storage | ~$5/month |
-| Total | ~$35/month |
+| ElastiCache cache.t3.micro | ~$12/month |
+| MongoDB Atlas M0 | Free |
+| Total | ~$47/month |
 
 | Running Instance | Running Application on EC2 |
 | :---: | :---: |
 | ![alt text](<Screenshots/EC2 (2).png>) | ![alt text](Screenshots/EC2.png) |
+
+| Mongodb | ElastiCache |
+| :---: | :---: |
+| ![alt text](Screenshots/MongoDB.png) |  ![alt text](Screenshots/Redis.png) |
+
+
+## ThankYou 😊
