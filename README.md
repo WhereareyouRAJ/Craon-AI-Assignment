@@ -527,3 +527,159 @@ Copy `.env.example` to `.env` and fill in values before running. The `.env` file
 **Rate limiting with Redis-backed counters** — The job creation endpoint is protected against abuse with a 10 requests per minute per IP limit. Counters are stored in Redis so the limit works correctly across multiple API instances.
 
 **Network isolation** — All containers communicate on a private Docker bridge network. In production, Redis and MongoDB have no ports exposed to the host machine. Only the API port is reachable from outside the Docker network.
+
+---
+## Screenshots
+
+### App
+| Screenshot 1 | Screenshot 2 |
+| :---: | :---: |
+| ![alt text](Screenshots/App-1.png) | ![alt text](Screenshots/App-2.png) |
+| Screenshot 3 | Screenshot 4 |
+| ![alt text](Screenshots/App-3.png) | ![alt text](Screenshots/App-4.png) |
+| Screenshot 5 | Screenshot 6 |
+| ![alt text](Screenshots/App-5.png) | ![alt text](Screenshots/App-6.png) |
+
+### Prometheus 
+| Targets |
+| :---: |
+| ![alt text](Screenshots/Prometheus.png) |
+
+### Grafana
+| FlaskAPI Dashboard |
+| FlaskAPI Dashboard 1 | FlaskAPI Dashboard 2 |
+| :---: | :---: |
+| ![alt text](Screenshots/grafana.png) | ![alt text](Screenshots/grafana-2.png) |
+
+### Alerting
+| ![alt text](Screenshots/Alerting.png) |
+| ![alt text](Screenshots/Pending.png)  | [text](README.md) ![text](Screenshots/Firing.png) |
+# AWS EC2 Deployment Guide
+
+## Server Details
+
+| Setting | Value |
+|---|---|
+| OS | Ubuntu Server 24.04 LTS |
+| Instance type | t3.medium |
+| Storage | 50 GB |
+
+---
+
+## Security Group Rules
+
+Open these ports in your EC2 security group:
+
+| Port | Source | Purpose |
+|---|---|---|
+| 22 | My IP only | SSH access |
+| 8000 | 0.0.0.0/0 | API |
+| 3000 | My IP only | Grafana |
+| 5555 | My IP only | Flower |
+| 9090 | My IP only | Prometheus |
+
+---
+
+## Connect to the Server
+
+```bash
+chmod 400 your-key.pem
+ssh -i your-key.pem ubuntu@YOUR_SERVER_IP
+```
+
+---
+
+## Install Docker
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl gnupg
+
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+sudo usermod -aG docker ubuntu
+newgrp docker
+```
+
+---
+
+## Deploy the Application
+
+```bash
+# Clone the repo
+git clone https://github.com/YOUR_USERNAME/job-queue-api.git
+cd job-queue-api
+
+# Create environment file
+cp .env.example .env
+nano .env                      # fill in your values
+
+# Start all containers
+docker compose up --build -d
+
+# Verify everything is running
+docker compose ps
+```
+
+Visit `http://YOUR_SERVER_IP:8000/docs` to confirm the API is live.
+
+---
+
+## Start Monitoring (Optional)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+```
+
+| URL | Tool |
+|---|---|
+| http://YOUR_SERVER_IP:3000 | Grafana (admin / admin) |
+| http://YOUR_SERVER_IP:5555 | Flower |
+| http://YOUR_SERVER_IP:9090 | Prometheus |
+
+---
+
+## Common Commands
+
+```bash
+docker compose ps                  # check container status
+docker compose logs -f api         # stream API logs
+docker compose logs -f worker      # stream worker logs
+docker compose restart api         # restart one container
+docker compose down                # stop everything
+docker compose down -v             # stop and delete all data
+```
+
+## Redeploy After Code Changes
+
+```bash
+git pull
+docker compose up --build -d
+```
+
+---
+
+## Auto-restart After Server Reboot
+
+The `restart: unless-stopped` setting in `docker-compose.yml` handles this automatically. Just make sure Docker starts on boot:
+
+```bash
+sudo systemctl enable docker
+```
+
+---
+
+## Cost
+
+| Resource | Cost |
+|---|---|
+| t3.medium | ~$30/month |
+| 50 GB EBS storage | ~$5/month |
+| Total | ~$35/month |
