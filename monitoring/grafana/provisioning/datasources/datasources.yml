@@ -15,6 +15,5 @@ datasources:
   - name: Loki
     type: loki
     access: proxy
-    # "loki" is the Docker service name.
     url: http://loki:3100
     editable: true
