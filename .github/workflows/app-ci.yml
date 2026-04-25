@@ -10,6 +10,10 @@ on:
 jobs:
   test-and-audit:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,6 +51,10 @@ jobs:
   call-security-pipeline:
     uses: ./.github/workflows/security-pipeline.yml
     needs: test-and-audit
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     with:
       image_name: "jobqueue-api"
       context: .
