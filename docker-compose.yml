@@ -1,0 +1,175 @@
+version: "3.9"
+
+x-prod-env: &prod-env
+  REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+  MONGODB_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017
+  MONGODB_DB_NAME: jobqueue
+  APP_ENV: production
+
+x-security: &security
+  security_opt:
+    - no-new-privileges:true
+  read_only: true 
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+
+x-logging: &logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+
+services:
+  redis:
+    image: redis:7.0-alpine
+    container_name: jobqueue-redis
+    restart: unless-stopped
+    command: >
+      redis-server 
+      --maxmemory 512mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD}
+      --save 60 1000
+    volumes:
+      - redis-data:/data
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 600M
+    
+    logging:
+      <<: *logging
+
+    networks:
+      - backend
+  
+  mongodb:
+    image: mongo:7
+    container_name: jobqueue-mongo-prod
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: jobqueue
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    healthcheck:
+      test: >
+        CMD mongosh
+        --username ${MONGO_ROOT_USER}
+        --password ${MONGO_ROOT_PASSWORD}
+        --eval "db.adminCommand('ping')"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+    logging:
+      <<: *logging
+
+    networks:
+      - backend
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: Runtime
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      <<: *prod-env 
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+     
+    <<: *security
+
+    logging:
+      <<: *logging
+
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+      restart_policy:
+         condition: on-failure
+         delay: 5s
+         max_attempts: 3
+
+     
+    networks:
+      - backend  
+  
+  worker:
+    build:
+     context: .
+     dockerfile: Dockerfile
+     target: Runtime
+    
+    restart: unless-stopped
+    entrypoint: ["python", "-m", "celery"]
+    command: >
+      -A app.workers.celery_app.celery_app worker
+      --loglevel=info
+      --concurrency=4
+    environment:
+      <<: *prod-env
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+    logging:
+      <<: *logging
+    networks:
+      - backend
+
+volumes:
+  mongo_data:
+    driver: local
+  mongo_config:
+    driver: local
+  redis-data:
+    driver: local
+
+networks:
+  backend:
+    driver: bridge
