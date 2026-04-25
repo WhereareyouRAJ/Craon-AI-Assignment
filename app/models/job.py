@@ -28,7 +28,7 @@ class JobType(str, Enum):
 
 
 class Job(Document):
-    """
+    """  
     The MongoDB document for a job.
     Each field below becomes a column in the 'jobs' collection.
     """
