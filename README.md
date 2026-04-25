@@ -1,2 +1,0 @@
-# Craon-AI-Assignment
-Assignment
