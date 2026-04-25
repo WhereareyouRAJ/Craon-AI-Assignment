@@ -546,14 +546,18 @@ Copy `.env.example` to `.env` and fill in values before running. The `.env` file
 | ![alt text](Screenshots/Prometheus.png) |
 
 ### Grafana
-| FlaskAPI Dashboard |
 | FlaskAPI Dashboard 1 | FlaskAPI Dashboard 2 |
 | :---: | :---: |
 | ![alt text](Screenshots/grafana.png) | ![alt text](Screenshots/grafana-2.png) |
 
 ### Alerting
+| Alerting |
+| :---: |
 | ![alt text](Screenshots/Alerting.png) |
-| ![alt text](Screenshots/Pending.png)  | [text](README.md) ![text](Screenshots/Firing.png) |
+
+| Pending | Firing |
+| :---: | :---: |
+| ![alt text](Screenshots/Pending.png)  | ![text](Screenshots/Firing.png) |
 # AWS EC2 Deployment Guide
 
 ## Server Details
@@ -683,3 +687,7 @@ sudo systemctl enable docker
 | t3.medium | ~$30/month |
 | 50 GB EBS storage | ~$5/month |
 | Total | ~$35/month |
+
+| Running Instance | Running Application on EC2 |
+| :---: | :---: |
+| ![alt text](<Screenshots/EC2 (2).png>) | ![alt text](Screenshots/EC2.png) |
