@@ -1,0 +1,36 @@
+# =============================================================================
+# .gitignore — Files that must NEVER be committed to git
+# =============================================================================
+
+# Secrets — most important
+.env
+.env.local
+.env.production
+*.pem
+*.key
+*.p12
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# Test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local data
+data/
+logs/
+*.log
