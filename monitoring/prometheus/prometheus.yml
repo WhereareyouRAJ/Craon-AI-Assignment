@@ -1,0 +1,42 @@
+
+global:
+  scrape_interval: 15s
+ 
+  scrape_timeout: 10s
+ 
+  evaluation_interval: 15s
+ 
+  external_labels:
+    environment: "production"
+    project: "job-queue-api"
+ 
+scrape_configs:
+ 
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]   # Prometheus runs on port 9090
+ 
+ 
+
+  - job_name: "fastapi"
+    static_configs:
+      
+      - targets: ["api:8000"]
+    
+    metrics_path: "/metrics"
+ 
+
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis_exporter:9121"]
+ 
+
+  - job_name: "mongodb"
+    static_configs:
+      - targets: ["mongodb_exporter:9216"]
+ 
+ 
+  - job_name: "celery"
+    static_configs:
+      - targets: ["flower:5555"]
+    metrics_path: "/metrics"

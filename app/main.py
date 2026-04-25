@@ -6,6 +6,7 @@ Responsibilities:
   • Attach slowapi rate limiter (uses Redis to count requests per IP)
   • Mount the /jobs router
   • Provide a /health endpoint so infra knows the service is alive
+  • Expose a /metrics endpoint so Prometheus can scrape app metrics
 """
  
 from contextlib import asynccontextmanager
@@ -26,6 +27,10 @@ from beanie import init_beanie
 from app.config import settings
 from app.models.job import Job
 from app.routes.jobs import router as jobs_router
+ 
+# Prometheus — auto-instruments all FastAPI routes and exposes /metrics
+# This gives us: request count, request duration, response size — for free
+from prometheus_fastapi_instrumentator import Instrumentator
  
  
 # ── Rate Limiter ───────────────────────────────────────────────────────────────
@@ -104,6 +109,16 @@ limiter.limit("10/minute")(create_job)
  
 # ── Routers ────────────────────────────────────────────────────────────────────
 app.include_router(jobs_router)
+ 
+# ── Prometheus metrics ─────────────────────────────────────────────────────────
+# Instrumentator automatically tracks every HTTP request made to this app:
+#   - http_requests_total          (how many requests, by route and status code)
+#   - http_request_duration_seconds (how long each request took)
+#   - http_response_size_bytes      (response payload sizes)
+#
+# .instrument(app) hooks into FastAPI middleware to measure every request.
+# .expose(app)     creates the GET /metrics endpoint Prometheus will scrape.
+Instrumentator().instrument(app).expose(app)
  
  
 # ── Health check ───────────────────────────────────────────────────────────────

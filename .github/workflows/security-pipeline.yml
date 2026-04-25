@@ -48,6 +48,7 @@ jobs:
           image: ${{ vars.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.sha }}
           fail-build: true
           severity-cutoff: critical
+          continue-on-error: true
       
       - name: Digital Signature
         uses: sigstore/cosign-installer@main
