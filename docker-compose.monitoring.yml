@@ -557,7 +557,7 @@ Client (browser or curl)
         |-- saves job record --> MongoDB
         |-- sends task -------> Redis (queue)
         |
-        v
+        v     
    Celery Worker
         |
         |-- picks up task from Redis
