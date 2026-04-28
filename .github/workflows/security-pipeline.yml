@@ -12,7 +12,7 @@ on:
 env:
   AWS_REGION: ap-south-1
   ECR_REPOSITORY: craon-agents
-
+  IMAGE_TAG: ${{ github.sha }}
 jobs:
   build-and-secure:
     runs-on: ubuntu-latest
