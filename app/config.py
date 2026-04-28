@@ -1,4 +1,4 @@
-"""     
+"""           
 config.py — Central place for all settings.
 Reads values from your .env file automatically.
 """
