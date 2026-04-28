@@ -1,4 +1,4 @@
-"""
+"""    
 main.py — FastAPI application entry point.
  
 Responsibilities:

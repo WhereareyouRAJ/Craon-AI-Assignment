@@ -11,7 +11,7 @@ on:
         type: string
 env:
   AWS_REGION: ap-south-1
-  ECR_REPOSITORY: craon-agents
+  ECR_REPOSITORY: craon-core
   IMAGE_TAG: ${{ github.sha }}
 jobs:
   build-and-secure:
